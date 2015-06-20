@@ -57,15 +57,15 @@ for input_file in dirFileList:
 			if curNumber == doctorData['number']:
 				continue
 			else:
-				data['name'] = doctor
-				data['dept'] = dept
-				data['room'] = room
-				data['interval'] = interval
-				data['curnumber'] = curNumber
-				data['start'] = int(doctorData['start_time'])
-				data['end'] = int(timeStamp)
-				data['duration'] = data['end'] - data['start']
-				data['datetime'] = date
+				data['datetime'] 	= date
+				data['name'] 		= doctor
+				data['dept'] 		= dept
+				data['room'] 		= room
+				data['interval'] 	= interval
+				data['curnumber'] 	= curNumber
+				data['start'] 		= int(doctorData['start_time'])
+				data['end'] 		= int(timeStamp)
+				data['duration'] 	= data['end'] - data['start']
 				DB.insert(data)	
 
 				doctorData['start_time'] = timeStamp
