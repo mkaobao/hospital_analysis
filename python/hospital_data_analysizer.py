@@ -39,7 +39,9 @@ DB.setDBFile('wanfang.db')
 dirFileList = glob.glob(sys.argv[1] + '/*')
 for input_file in dirFileList:
 	input_file_ptr = open(input_file, 'r')
+	print "%s is starting..." % (input_file)
 	doctorData_list = {}
+	checkPointCount = 0
 	for line in input_file_ptr:
 		line = line.strip('\n')
 		token = line.split(' ')
@@ -57,22 +59,35 @@ for input_file in dirFileList:
 			if curNumber == doctorData['number']:
 				continue
 			else:
+				data = {}
 				data['datetime'] 	= date
 				data['name'] 		= doctor
 				data['dept'] 		= dept
 				data['room'] 		= room
 				data['interval'] 	= interval
-				data['curnumber'] 	= curNumber
+				if -1 != curNumber.find('('):
+					data['curnumber'] 	= int(curNumber.split('(')[0])
+					data['comment'] 	= '{"over":true}'
+				else:
+					data['curnumber'] 	= int(curNumber)
+					data['comment'] 	= '{"over":false}'
 				data['start'] 		= int(doctorData['start_time'])
 				data['end'] 		= int(timeStamp)
 				data['duration'] 	= data['end'] - data['start']
-				DB.insert(data)	
+				DB.insert(data)
+
+				checkPointCount += 1
+				if checkPointCount == 100:
+					DB.checkPoint()
+					checkPoint = 0
 
 				doctorData['start_time'] = timeStamp
 				doctorData['number'] = curNumber
 		else:
 			doctorData_list[key]={'number':curNumber, 'start_time':timeStamp}
 
+	print "%s is completed!" % (input_file)
 	doctorData_list.clear()
 	input_file_ptr.close()
-	output_file_ptr.close()
+	DB.checkPoint()
+DB.close()

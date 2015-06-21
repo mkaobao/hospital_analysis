@@ -1,9 +1,5 @@
+import json
 
+data = json.loads('{"test":true}')
 
-data = 5
-
-print '%2d' % data
-
-string = 'haha'
-
-print str(string)
+print type(data['test'])
