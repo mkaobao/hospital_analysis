@@ -28,6 +28,22 @@ def insert(params):
 def checkPoint():
 	_cur.execute("PRAGMA wal_checkpoint(PASSIVE);")
 
+def listAll():
+	_cur.execute("SELECT DISTINCT Dept, Name FROM pacient_list ORDER BY Dept, Name;")
+	return _cur.fetchall()
+
+def searchByParams(params):
+	if 'name' in params:
+		query = 'Name="%s"' % params['name']
+		if 'date' in params:
+			query += ' AND Datetime="%s"' % params['date']
+		if 'interval' in params:
+			query += ' AND Interval="%s"' % params['interval']
+		_cur.execute("SELECT * FROM pacient_list WHERE %s ORDER BY Datetime, Start;" % query)
+		return _cur.fetchall()
+	else:
+		return []
+
 def close():
 	_con.close()
 
