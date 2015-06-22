@@ -1,6 +1,8 @@
+# This Python file uses the following encoding: utf-8
 import database as DB
 import datetime
 import json
+import sys
 
 DB.setDBFile('wanfang.db')
 
@@ -23,7 +25,8 @@ def printUsage():
 	print 'doc    [name]                                    list the doctor\'s pacient data'
 	print '       -date [YYYY-MM-DD]                        list on the date'
 	print '       -weekday [1-7]                            list with the same weekday'
-	print '       -interval [Morning|Afternoon|Night]       list with the interval'
+	print '       -interval [M|A|N]                         list with the interval'
+	print 'export [filePath]                                export all daoctor data'
 
 def listAll():
 	result = DB.listAll()
@@ -32,14 +35,18 @@ def listAll():
 
 
 def listDoctor(params):
+	output = None
+	if 'file' in params:
+		output = open(params['file'], 'a')
+
 	result = DB.searchByParams(params)
 	for row in result:
 		# Datetime, Name, Dept, Room, Interval, Comment, CurNumber, Start, End, Duration
 		date 		= row[1]
-		week 		= datetime.datetime.strptime(date, '%Y-%m-%d').weekday()
-		week += 1
-		if 2 != week:
-			continue
+		week 		= datetime.datetime.strptime(date, '%Y-%m-%d').weekday() + 1
+		if 'weekday' in params:
+			if int(params['weekday']) != week:
+				continue
 		name 		= row[2]
 		dept 		= row[3]
 		room      	= row[4]
@@ -51,8 +58,22 @@ def listDoctor(params):
 		curnumber 	= row[7]
 		start 		= datetime.datetime.fromtimestamp( int(row[8]) ).strftime('%Y-%m-%d %H:%M:%S')
 		duration 	= transfer_minute(row[10])
-		print '%s (%d)\t%s\t%s\t%s\t%s%s\t%s\t%s' % (date, week, name, dept, interval, two_digit_number(curnumber), comment, start, duration)
 
+		line = '%s (%d)\t%s\t%s\t%s\t%s%s\t%s\t%s' % (date, week, unicode(name), unicode(dept), unicode(interval), two_digit_number(curnumber), comment, start, duration)
+		if output != None:
+			output.write(line.encode('utf-8') + '\n')
+		else:
+			print line
+	output.close()
+
+def export(filePath):
+	doctorList = DB.getDoctorList()
+	for doctor in doctorList:
+		fileName = filePath + '/' + unicode(doctor[0]) + '.txt'
+		data = {}
+		data['name'] = doctor
+		data['file'] = fileName
+		listDoctor(data)
 
 usage = True
 
@@ -70,8 +91,7 @@ while True:
 		data['name'] = token[1]
 		for i in range(2,len(token)):
 			if i%2==0:
-				para = token[i].split('-')
-
+				para = token[i].split('-')[1]
 				if para == 'date' or para == 'interval' or para == 'weekday':
 					data[para] = token[i+1]
 				else:
@@ -79,6 +99,8 @@ while True:
 			else:
 				continue
 		listDoctor(data)
+	elif token[0] == 'export':
+		export(token[1])
 	else:
 		print 'unknow command'
 		usage = True

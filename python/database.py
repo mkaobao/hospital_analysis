@@ -1,3 +1,4 @@
+# This Python file uses the following encoding: utf-8
 import sqlite3 as lite
 import os.path
 
@@ -38,11 +39,22 @@ def searchByParams(params):
 		if 'date' in params:
 			query += ' AND Datetime="%s"' % params['date']
 		if 'interval' in params:
-			query += ' AND Interval="%s"' % params['interval']
+			string = '上午診'
+			if params['interval'] == 'M' or params['interval'] == 'm':
+				string = '上午診'
+			elif params['interval'] == 'A' or params['interval'] == 'a':
+				string = '下午診'
+			elif params['interval'] == 'N' or params['interval'] == 'n':
+				string = '夜間診'
+			query += ' AND Interval="%s"' % string
 		_cur.execute("SELECT * FROM pacient_list WHERE %s ORDER BY Datetime, Start;" % query)
 		return _cur.fetchall()
 	else:
 		return []
+
+def getDoctorList():
+	_cur.execute("SELECT DISTINCT Name FROM pacient_list;")
+	return _cur.fetchall()
 
 def close():
 	_con.close()
