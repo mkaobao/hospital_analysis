@@ -15,7 +15,7 @@ def parseDoctorData(url, file_ptr):
 		soup 		= BeautifulSoup(html_get)
 	except:
 		log = open(logFile, 'a')
-		log.write("%s [err] get web failed." % date)
+		log.write("%s [err] get web failed.\n" % date)
 		log.close()
 		return 60
 
