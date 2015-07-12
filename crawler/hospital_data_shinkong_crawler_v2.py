@@ -18,6 +18,11 @@ def printer(item, date, dept, file_ptr):
     counter = 0
     for i in range(len(item)/6):
         timestamp     = time.time()
+        if "即將開始看診" in item[counter+1] :
+            return
+        if "結束看診" in item[counter+1] :
+            counter = counter + 3
+            continue
         file_ptr.write('%.0f %s %s %s %s %s\n' % (timestamp, date, dept, item[counter], item[counter+1], item[counter+4]))
         counter = counter + 6
     
