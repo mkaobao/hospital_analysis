@@ -35,10 +35,6 @@ def listAll():
 
 
 def listDoctor(params):
-	output = None
-	if 'file' in params:
-		output = open(params['file'], 'a')
-
 	result = DB.searchByParams(params)
 	for row in result:
 		# Datetime, Name, Dept, Room, Interval, Comment, CurNumber, Start, End, Duration
@@ -60,20 +56,66 @@ def listDoctor(params):
 		duration 	= transfer_minute(row[10])
 
 		line = '%s (%d)\t%s\t%s\t%s\t%s%s\t%s\t%s' % (date, week, unicode(name), unicode(dept), unicode(interval), two_digit_number(curnumber), comment, start, duration)
-		if output != None:
+		print line
+
+def listDoctorForExport(params):
+	output = None
+	result = DB.searchByParams(params)
+	curInterval = ''
+	curDate = ''
+	lastNumber = ''
+	segment = {}
+
+	for row in result:
+		# Datetime, Name, Dept, Room, Interval, Comment, CurNumber, Start, End, Duration
+		date 		= row[1]
+		week 		= datetime.datetime.strptime(date, '%Y-%m-%d').weekday() + 1
+		name 		= row[2]
+		dept 		= row[3]
+		room      	= row[4]
+		interval 	= row[5]
+		if row[6] == '{"over":true}':
+			continue
+		curnumber 	= row[7]
+		start 		= datetime.datetime.fromtimestamp( int(row[8]) ).strftime('%H:%M:%S')
+		duration 	= transfer_minute(row[10])
+
+		if output == None:
+			line = '%s/%s-%s.txt' % (params['filePath'], dept, name)
+			output = open(line, 'a')
+
+		if len(segment)==0:
+			curInterval = interval
+			curDate = date
+			line = '%s (%d)\t%s\t%s\t%s' % (date, week, unicode(name), unicode(dept), unicode(interval))
 			output.write(line.encode('utf-8') + '\n')
+
+		if curInterval == interval and curDate == date:
+			segment[int(curnumber)] = start
+			lastNumber = curnumber
+			# print '%s %s' % (curnumber, start)
 		else:
-			print line
+			for i in range(1, int(lastNumber)):
+				if i not in segment:
+					segment[i] = ''
+				output.write('%d %s\n' % (i, segment[i]))
+			output.write('\n')
+			segment = {}
+
+	for i in range(1, int(lastNumber)):
+		if i not in segment:
+			segment[i] = ''
+		output.write('%d %s\n' % (i, segment[i]))
+
 	output.close()
 
 def export(filePath):
 	doctorList = DB.getDoctorList()
 	for doctor in doctorList:
-		fileName = filePath + '/' + unicode(doctor[0]) + '.txt'
 		data = {}
 		data['name'] = doctor
-		data['file'] = fileName
-		listDoctor(data)
+		data['filePath'] = filePath
+		listDoctorForExport(data)
 
 usage = True
 
