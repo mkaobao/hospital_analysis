@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
+from log_manager import ERRORLOG
+from log_manager import SYSLOG
+import os
 import urllib
 import time
 import datetime
 import re
 
-logFile    = 'error.log'
+dir_path   = '/home/mkao/workplace/hospital_analysis/crawler/'
 hospital   = 'shinkong'
 
 # remove html tag
@@ -27,20 +30,14 @@ def printer(item, date, dept, file_ptr):
         counter = counter + 6
     
 def parseDoctorData(url, file_ptr):
-    timestamp = time.time()
-    date = datetime.datetime.fromtimestamp(timestamp).strftime('%Y_%m_%d %H:%M:%S')
-
     try:
         handle       = urllib.urlopen(url)
         html_get     = handle.read()
         soup         = BeautifulSoup(html_get)
     except:
-        log = open(logFile, 'a')
-        log.write("%s [err] %s get web failed.\n" % (date, hospital))
-        log.close()
+        ERRORLOG('shinkong', 'url read failed!')
         return 60
 
-    print date + ' OK'
     lblDate = soup.find_all('span', {"id":"lblNoon"})
     lblDept = soup.find_all('span', {"id":"lblDept"})
     
@@ -64,33 +61,36 @@ def parseDoctorData(url, file_ptr):
     return 20
 
 def getFilename(hospital):
+    if not os.path.exists(dir_path + hospital) :
+        os.makedirs(dir_path + hospital)
     date = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d')
-    file_name = hospital + '/' + hospital + '_' + date  # file_path/file_name
+    file_name = dir_path + hospital + '/' + hospital + '_' + date  # file_path/file_name
     return file_name
 
 
 
-hospital_url      = "https://regis.skh.org.tw/regisn/RegistProgressList.aspx?DeptNo="
-hospital_url_dep = ""
-
-# 各個科別 
+hospital_url        = "https://regis.skh.org.tw/regisn/RegistProgressList.aspx?DeptNo="
 hospital_url_dep_no = ['01','02','03','04','05','06','07','08','09','MA','11','12','13','14','15','16','17','19','20','21','22','23','24','25','26','27','28','29','31','41','43','45','66','67','99']
+hospital_url_dep    = ""
+file_name = getFilename(hospital)
 sleep_time = 0
-file_name = ''
 file_count = 0
+
+SYSLOG("shinkong", "%s start!" % file_name)
 
 while True:
     if file_count == 0:
         file_count = 180
-        temp_file_name = getFilename(hospital)
-        if file_name != temp_file_name:
-            file_name = temp_file_name
-            print "file name is reset: " + file_name
+        if file_name != getFilename(hospital):
+            SYSLOG("shinkong", "%s is complete" % file_name)
+            break
+    file_count -= 1
+    
     file_ptr = open(file_name, 'a')
+    
     for no in hospital_url_dep_no :
         hospital_url_dep = hospital_url + no
-        # print hospital_url_dep
         sleep_time = parseDoctorData(hospital_url_dep, file_ptr)
+    
     file_ptr.close()
     time.sleep( sleep_time )
-    file_count -= 1
