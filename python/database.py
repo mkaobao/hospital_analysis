@@ -17,10 +17,10 @@ def setDBFile(fileName):
 	global _con
 	global _cur
 	ret = check_file_exist(fileName)
-	_con = lite.connect(fileName)
-	_cur = _con.cursor()
 	if False == ret:
 		init_db()
+	_con = lite.connect(fileName)
+	_cur = _con.cursor()
 
 def insert(params):
 	_cur.execute("INSERT INTO pacient_list(Datetime, Name, Dept, Room, Interval, Comment, CurNumber, Start, End, Duration) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d');" % (params['datetime'], params['name'], params['dept'], params['room'], params['interval'], params['comment'], params['curnumber'], params['start'], params['end'], params['duration']))

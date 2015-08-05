@@ -34,12 +34,15 @@ if len(sys.argv)!=2:
 	print '       parse all the files in the directory and generate database'
 	sys.exit()
 
-DB.setDBFile('wanfang.db')
 
-dirFileList = glob.glob(sys.argv[1] + '/*')
+filePath = sys.argv[1]
+dirFileList = glob.glob(filePath + '/*')
+DB.setDBFile(filePath + '.db')
+
 for input_file in dirFileList:
 	input_file_ptr = open(input_file, 'r')
 	print "%s is starting..." % (input_file)
+
 	doctorData_list = {}
 	checkPointCount = 0
 	for line in input_file_ptr:
@@ -66,11 +69,18 @@ for input_file in dirFileList:
 				data['room'] 		= room
 				data['interval'] 	= interval
 				if -1 != curNumber.find('('):
-					data['curnumber'] 	= int(curNumber.split('(')[0])
-					data['comment'] 	= '{"over":true}'
+					tempString = curNumber.split('(')[0]
+					if tempString.isdigit() == True :
+						data['curnumber'] 	= int(tempString)
+						data['comment'] 	= '{"over":true}'
+					else:
+						continue
 				else:
-					data['curnumber'] 	= int(curNumber)
-					data['comment'] 	= '{"over":false}'
+					if curNumber.isdigit() == True :
+						data['curnumber'] 	= int(curNumber)
+						data['comment'] 	= '{"over":false}'
+					else:
+						continue
 				data['start'] 		= int(doctorData['start_time'])
 				data['end'] 		= int(timeStamp)
 				data['duration'] 	= data['end'] - data['start']
