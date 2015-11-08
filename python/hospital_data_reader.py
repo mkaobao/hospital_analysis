@@ -180,12 +180,11 @@ def calculate(config):
     #     print '%d\tavg delta: %.3f' % (config, (float)(totalDelta/deltaCount))
     # print 'totalGap: %d, count: %d, average gap: %.3f' % (totalGap, count, math.ceil((float)(totalGap)/count))
 
-usage = True
-
+#########################
+### main
+#########################
+printUsage()
 while True:
-    if usage:
-        printUsage()
-        usage = False
     line = raw_input('Enter Command: ')
     token = line.split(' ')
 
@@ -206,9 +205,9 @@ while True:
         listDoctor(data)
     elif token[0] == 'export':
         export(token[1])
-    elif token[0] == 'ca':
-        # for i in range(1,30):
-        calculate(10);
+    # elif token[0] == 'ca':
+    #     for i in range(1,30):
+    #         calculate(10);
     else:
         print 'unknow command'
-        usage = True
+        printUsage()
