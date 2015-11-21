@@ -17,15 +17,15 @@ def transfer_minute(second):
 	return '%s:%s:%s' % (two_digit_number(out_hr), two_digit_number(out_min), two_digit_number(out_sec))
 
 # === database doctor structure ===
-# { 
-# 	datetime 	[string], 
-# 	name 		[string], 
-# 	dept		[string], 
-# 	room		[string], 
-# 	interval	[string], 
-# 	curNumber 	[int], 
-# 	start 		[int], 
-# 	end 		[int], 
+# {
+# 	datetime 	[string],
+# 	name 		[string],
+# 	dept		[string],
+# 	room		[string],
+# 	interval	[string],
+# 	curNumber 	[int],
+# 	start 		[int],
+# 	end 		[int],
 # 	duration 	[int]
 # }
 
@@ -59,7 +59,7 @@ for input_file in dirFileList:
 		key = '%s %s %s %s' % (date, dept, doctor, interval)
 		if key in doctorData_list:
 			doctorData = doctorData_list[key]
-			if curNumber == doctorData['number']:
+			if curNumber == doctorData['number'] or (int(curNumber.split('(')[0]) < int(doctorData['number'].split('(')[0]):
 				continue
 			else:
 				data = {}
@@ -68,16 +68,16 @@ for input_file in dirFileList:
 				data['dept'] 		= dept
 				data['room'] 		= room
 				data['interval'] 	= interval
-				if -1 != curNumber.find('('):
-					tempString = curNumber.split('(')[0]
+				if -1 != doctorData['number'].find('('):
+					tempString = doctorData['number'].split('(')[0]
 					if tempString.isdigit() == True :
 						data['curnumber'] 	= int(tempString)
 						data['comment'] 	= '{"over":true}'
 					else:
 						continue
 				else:
-					if curNumber.isdigit() == True :
-						data['curnumber'] 	= int(curNumber)
+					if doctorData['number'].isdigit() == True :
+						data['curnumber'] 	= int(doctorData['number'])
 						data['comment'] 	= '{"over":false}'
 					else:
 						continue
