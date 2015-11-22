@@ -254,14 +254,9 @@ def generateData(doctorName):
                 f.write("=====(%d %s)======\n" %(k,inn))
                 for num in range(len(store_n[inn])):
                     #print (num+1, len(store_n[inn][num+1]))
-                    f.write('%d\t%.2f\t%d\t%s\n' %(num+1,store_n[inn][num+1][int(len(store_n[inn][num+1])/2)], len(store_n[inn][num+1]),inn))
-#            f.write("=====(%d)======\n" %k)
-            #for aa in range(len(num)):
-                    #print (aa+1,len(num[aa+1]))
-            #    f.write('%d\t%.2f\t%d\n' %(aa+1,num[aa+1][int(len(num[aa+1])/2)], len(num[aa+1])))
-
-
-#                    f.write( '%d\t%.2f\n' % (j, weeksData[k][i][j]) )
+                    store_n[inn][num+1].sort()
+                    size_num = len(store_n[inn][num+1])
+                    f.write('%d\t%.2f\t%d\t%s\n' %(num+1,store_n[inn][num+1][int(size_num/2)], size_num,inn))
         f.close()
     debugFile.close()
 ##########################
