@@ -2,6 +2,7 @@ import sys
 import datetime
 import glob
 import database as DB
+import os
 
 def two_digit_number(number):
 	number = int(number)
@@ -17,15 +18,15 @@ def transfer_minute(second):
 	return '%s:%s:%s' % (two_digit_number(out_hr), two_digit_number(out_min), two_digit_number(out_sec))
 
 # === database doctor structure ===
-# {
-# 	datetime 	[string],
-# 	name 		[string],
-# 	dept		[string],
-# 	room		[string],
-# 	interval	[string],
-# 	curNumber 	[int],
-# 	start 		[int],
-# 	end 		[int],
+# { 
+# 	datetime 	[string], 
+# 	name 		[string], 
+# 	dept		[string], 
+# 	room		[string], 
+# 	interval	[string], 
+# 	curNumber 	[int], 
+# 	start 		[int], 
+# 	end 		[int], 
 # 	duration 	[int]
 # }
 
@@ -36,6 +37,8 @@ if len(sys.argv)!=2:
 
 
 filePath = sys.argv[1]
+save_done_path = filePath+'/../row_data_done/%s' %filePath.split('/')[-1]
+
 dirFileList = glob.glob(filePath + '/*')
 DB.setDBFile(filePath + '.db')
 
@@ -59,7 +62,7 @@ for input_file in dirFileList:
 		key = '%s %s %s %s' % (date, dept, doctor, interval)
 		if key in doctorData_list:
 			doctorData = doctorData_list[key]
-			if curNumber == doctorData['number'] or (int(curNumber.split('(')[0]) < int(doctorData['number'].split('(')[0]):
+			if (curNumber == doctorData['number']) :#or (int(curNumber.split('(')[0]) < int(doctorData['number'].split('(')[0])):
 				continue
 			else:
 				data = {}
@@ -84,7 +87,7 @@ for input_file in dirFileList:
 				data['start'] 		= int(doctorData['start_time'])
 				data['end'] 		= int(timeStamp)
 				data['duration'] 	= data['end'] - data['start']
-				DB.insert(data)
+				#DB.insert(data)
 
 				checkPointCount += 1
 				if checkPointCount == 100:
@@ -96,6 +99,10 @@ for input_file in dirFileList:
 		else:
 			doctorData_list[key]={'number':curNumber, 'start_time':timeStamp}
 
+	startpath = str(input_file)
+	finalpath = save_done_path+'/'+str(input_file).split('/')[-1]
+	os.system('mv '+startpath+' '+finalpath)
+	print('mv '+startpath+' '+finalpath)
 	print "%s is completed!" % (input_file)
 	doctorData_list.clear()
 	input_file_ptr.close()

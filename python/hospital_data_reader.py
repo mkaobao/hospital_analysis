@@ -5,8 +5,8 @@ import json
 import sys
 import math
 
-#DB.setDBFile('wanfang.db')
-DB.setDBFile('vghtpe.db')
+DB.setDBFile('wanfang.db')
+#DB.setDBFile('vghtpe.db')
 
 def two_digit_number(number):
     number = int(number)
@@ -68,6 +68,7 @@ def listDoctorForExport(params):
     curDate = ''
     lastNumber = ''
     segment = {}
+    printTitle = True
 
     for row in result:
         # Datetime, Name, Dept, Room, Interval, Comment, CurNumber, Start, End, Duration
@@ -77,7 +78,7 @@ def listDoctorForExport(params):
         dept        = row[3]
         room        = row[4]
         interval    = row[5]
-        if row[6] == '{"over":true}':
+        if row[6] != '{"over":true}':
             continue
         curnumber   = row[7]
         start       = datetime.datetime.fromtimestamp( int(row[8]) ).strftime('%H:%M:%S')
@@ -87,30 +88,37 @@ def listDoctorForExport(params):
             line = '%s/%s-%s.txt' % (params['filePath'], dept, name)
             output = open(line, 'w')
 
-        if len(segment)==0:
+        if printTitle == True:
             curInterval = interval
             curDate = date
             line = '%s (%d)\t%s\t%s\t%s' % (date, week, unicode(name), unicode(dept), unicode(interval))
             output.write(line.encode('utf-8') + '\n')
+            printTitle = False
 
         if curInterval == interval and curDate == date:
-            segment[int(curnumber)] = start
-            lastNumber = curnumber
+            # segment[int(curnumber)] = start
+            # lastNumber = curnumber
             # print '%s %s' % (curnumber, start)
+            if row[6] == '{"over":true}':
+                output.write('%d (over)\t%s\n' % (curnumber, start))
+            else:
+                output.write('%d\t%s\n' % (curnumber, start))
         else:
-            for i in range(1, int(lastNumber)):
-                if i not in segment:
-                    segment[i] = ''
-                output.write('%d\t%s\n' % (i, segment[i]))
-            output.write('\n')
-            segment = {}
+            printTitle = True
+        # else:
+        #     for i in range(1, int(lastNumber)):
+        #         if i not in segment:
+        #             segment[i] = ''
+        #         output.write('%d\t%s\n' % (i, segment[i]))
+        #     output.write('\n')
+        #     segment = {}
 
-    for i in range(1, int(lastNumber)):
-        if i not in segment:
-            segment[i] = ''
-        output.write('%d\t%s\n' % (i, segment[i]))
-
-    output.close()
+    # for i in range(1, int(lastNumber)):
+    #     if i not in segment:
+    #         segment[i] = ''
+    #     output.write('%d\t%s\n' % (i, segment[i]))
+    if output != None:
+        output.close()
 
 def export(filePath):
     doctorList = DB.getDoctorList()
