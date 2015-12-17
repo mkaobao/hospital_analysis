@@ -120,6 +120,103 @@ def listDoctorForExport(params):
     if output != None:
         output.close()
 
+
+def listDoctorForOrderExport(params):
+    #Export format:
+    #number, date, time, interval, order(actual order meeting doctor), isPassed(whether the patient is late, 0 == False, 1 == True), passedCount(including missing ones), lateCount 
+    output = None
+    result = DB.searchByParams(params)
+    curInterval = u''
+    curDate = ''
+    lastRegularNumber = 0
+    order = 1
+    passedCount = 0
+    curDate = ''
+    curInterval = ''
+    signBook = []
+    sessionData = []
+    
+    #Signal as EOF
+    result.append(['','1970-1-1','','','','','',0,0,0,0])
+
+    for row in result:
+        # Datetime, Name, Dept, Room, Interval, Comment, CurNumber, Start, End, Duration
+        date        = unicode(row[1])
+        week        = datetime.datetime.strptime(date, '%Y-%m-%d').weekday() + 1
+        #if week != 2:
+        #    continue
+        name        = row[2]
+        dept        = row[3]
+        room        = row[4]
+        interval    = unicode(row[5])
+        #if row[6] != '{"over":true}':
+        #    continue
+        number   = int(row[7])
+        start       = datetime.datetime.fromtimestamp(int(row[8])).strftime('%H:%M:%S')
+        duration    = transfer_minute(row[10])
+        
+        if output == None:
+            line = '%s/%s-%s.txt' % (unicode(params['filePath']).encode('utf-8'), unicode(dept).encode('utf-8'), unicode(name).encode('utf-8'))
+            output = open(line, 'w')
+            output.write('number\tdate\ttime\tinterval\torder\tisPassed\tpassedCount\tlateCount\n')
+        
+        #Initialization for each intervals
+        #1. Read everything into sessionData.
+        #2. Add lateCount before processing the next interval
+        if curInterval != interval or curDate != date:
+            if len(signBook) > 0:
+                lastRegularNumber = 0
+                for i in range( 0 , len(sessionData)):
+                    if i == 0:
+                        lastLateCount = 0
+                    else:
+                        lastLateCount = sessionData[i-1]['lateCount']
+                    if sessionData[i]['isPassed'] == 0:
+                        delta = sessionData[i]['number'] - lastRegularNumber
+                        if delta > 1:
+                            for steps in range(1, delta):
+                                index = sessionDataIndex(sessionData, 'number', sessionData[i]['number'] - steps)
+                                if index != -1 and sessionData[index]['number'] in signBook:
+                                   lastLateCount += 1
+                        sessionData[i]['lateCount'] = lastLateCount
+                        lastRegularNumber = sessionData[i]['number']
+                    else:
+                        sessionData[i]['lateCount'] = lastLateCount - 1
+                for p in sessionData:
+                    #output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n' % (p['number'] , p['date'].encode('utf-8') , p['start'].encode('utf-8') , p['interval'].encode('utf-8') , p['order'] , p['isPassed'] , p['passedCount'], p['lateCount']))
+                    output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n' % (p['number'] , p['date'] , p['start'] , p['interval'] , p['order'] , p['isPassed'] , p['passedCount'], p['lateCount']))
+
+
+            #Format of the Dictionary for each rows
+            sessionData = []
+            signBook = []
+            curInterval = interval
+            curDate = date
+            lastRegularNumber = 0
+            order = 1
+            passedCount = 0
+           
+        if number in signBook:##########################
+            continue
+        
+        #PASSED : decrese passedCount
+        if row[6] == '{"over":true}':
+            passedCount -= 1
+            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':1,'passedCount':passedCount,'lateCount':0})
+        
+        #Regular: might encounter passing
+        else: 
+            if lastRegularNumber != number - 1:
+                passedCount += number - lastRegularNumber - 1
+            lastRegularNumber = number
+            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':0,'passedCount':passedCount,'lateCount':0})
+        
+        signBook.append(number)
+        order += 1
+
+    if output != None:
+        output.close()
+
 def export(filePath):
     doctorList = DB.getDoctorList()
     for doctor in doctorList:
@@ -127,6 +224,14 @@ def export(filePath):
         data['name'] = doctor
         data['filePath'] = filePath
         listDoctorForExport(data)
+
+def export_order(filePath):
+    doctorList = DB.getDoctorList()
+    for doctor in doctorList
+        data{}
+        data['name'] = doctor
+        data['filePath'] = filePath
+        listDoctorForOrderExport(data)
 
 def calculate(config):
     data = {}
@@ -215,6 +320,8 @@ while True:
         listDoctor(data)
     elif token[0] == 'export':
         export(token[1])
+    elif token[0] == 'export_order'
+        export_order(token[1])
     elif token[0] == 'ca':
         # for i in range(1,30):
         calculate(10);
