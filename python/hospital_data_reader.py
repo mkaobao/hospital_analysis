@@ -29,6 +29,7 @@ def printUsage():
     print '       -weekday [1-7]                            list with the same weekday'
     print '       -interval [M|A|N]                         list with the interval'
     print 'export [filePath]                                export all daoctor data'
+    print 'export_order [filePath]                          export all daoctor data with ordering'
     print 'calculate                                        calculate doctor prepare data'
 
 def listAll():
