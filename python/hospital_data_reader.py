@@ -36,6 +36,12 @@ def listAll():
     for row in result:
         print '%s\t%s' % (unicode(row[0]), unicode(row[1]))
 
+def sessionDataIndex(haystack,column,needle):
+    for i in range(0, len(haystack)):
+        if haystack[i][column] == needle:
+            return i
+    return -1
+
 
 def listDoctor(params):
     result = DB.searchByParams(params)
@@ -122,8 +128,9 @@ def listDoctorForExport(params):
 
 
 def listDoctorForOrderExport(params):
-    #Export format:
+    #Exporting format:
     #number, date, time, interval, order(actual order meeting doctor), isPassed(whether the patient is late, 0 == False, 1 == True), passedCount(including missing ones), lateCount 
+
     output = None
     result = DB.searchByParams(params)
     curInterval = u''
@@ -154,12 +161,12 @@ def listDoctorForOrderExport(params):
         number   = int(row[7])
         start       = datetime.datetime.fromtimestamp(int(row[8])).strftime('%H:%M:%S')
         duration    = transfer_minute(row[10])
-        
+
         if output == None:
             line = '%s/%s-%s.txt' % (unicode(params['filePath']).encode('utf-8'), unicode(dept).encode('utf-8'), unicode(name).encode('utf-8'))
             output = open(line, 'w')
             output.write('number\tdate\ttime\tinterval\torder\tisPassed\tpassedCount\tlateCount\n')
-        
+
         #Initialization for each intervals
         #1. Read everything into sessionData.
         #2. Add lateCount before processing the next interval
@@ -183,11 +190,10 @@ def listDoctorForOrderExport(params):
                     else:
                         sessionData[i]['lateCount'] = lastLateCount - 1
                 for p in sessionData:
-                    #output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n' % (p['number'] , p['date'].encode('utf-8') , p['start'].encode('utf-8') , p['interval'].encode('utf-8') , p['order'] , p['isPassed'] , p['passedCount'], p['lateCount']))
                     output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n' % (p['number'] , p['date'] , p['start'] , p['interval'] , p['order'] , p['isPassed'] , p['passedCount'], p['lateCount']))
 
 
-            #Format of the Dictionary for each rows
+            #Formatting the dictionary for each rows
             sessionData = []
             signBook = []
             curInterval = interval
@@ -199,7 +205,7 @@ def listDoctorForOrderExport(params):
         if number in signBook:##########################
             continue
         
-        #PASSED : decrese passedCount
+        #PASSED : decrease passedCount
         if row[6] == '{"over":true}':
             passedCount -= 1
             sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':1,'passedCount':passedCount,'lateCount':0})
@@ -227,8 +233,8 @@ def export(filePath):
 
 def export_order(filePath):
     doctorList = DB.getDoctorList()
-    for doctor in doctorList
-        data{}
+    for doctor in doctorList:
+        data = {}
         data['name'] = doctor
         data['filePath'] = filePath
         listDoctorForOrderExport(data)
@@ -320,7 +326,7 @@ while True:
         listDoctor(data)
     elif token[0] == 'export':
         export(token[1])
-    elif token[0] == 'export_order'
+    elif token[0] == 'export_order':
         export_order(token[1])
     elif token[0] == 'ca':
         # for i in range(1,30):
