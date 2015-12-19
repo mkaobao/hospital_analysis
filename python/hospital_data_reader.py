@@ -4,6 +4,7 @@ import datetime
 import json
 import sys
 import math
+import codecs
 
 DB.setDBFile('wanfang.db')
 #DB.setDBFile('vghtpe.db')
@@ -164,9 +165,10 @@ def listDoctorForOrderExport(params):
         duration    = transfer_minute(row[10])
 
         if output == None:
-            line = '%s/%s-%s.txt' % (unicode(params['filePath']).encode('utf-8'), unicode(dept).encode('utf-8'), unicode(name).encode('utf-8'))
+            line = u'%s/%s-%s.txt' % (params['filePath'].encode('utf-8').decode('utf-8'), dept.encode('utf-8').decode(
+                    'utf-8'), name.encode('utf-8').decode('utf-8'))
             output = open(line, 'w')
-            output.write('number\tdate\ttime\tinterval\torder\tisPassed\tpassedCount\tlateCount\n')
+            output.write('number\tdate\ttime\tinterval\torder\tisPassed\tpassedCount\tlateCount\tduration\n')
 
         #Initialization for each intervals
         #1. Read everything into sessionData.
@@ -191,8 +193,9 @@ def listDoctorForOrderExport(params):
                     else:
                         sessionData[i]['lateCount'] = lastLateCount - 1
                 for p in sessionData:
-                    output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n' % (p['number'] , p['date'] , p['start'] , p['interval'] , p['order'] , p['isPassed'] , p['passedCount'], p['lateCount']))
-
+                    output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n' % (p['number'] , p['date'] , p['start'] ,
+                                                                       p['interval'] , p['order'] , p['isPassed'] ,
+                                                                       p['passedCount'], p['lateCount'], p['duration']))
 
             #Formatting the dictionary for each rows
             sessionData = []
@@ -209,14 +212,16 @@ def listDoctorForOrderExport(params):
         #PASSED : decrease passedCount
         if row[6] == '{"over":true}':
             passedCount -= 1
-            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':1,'passedCount':passedCount,'lateCount':0})
+            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),
+                                'interval':interval.encode('utf-8'),'order':order,'isPassed':1,
+                                'passedCount':passedCount,'lateCount':0,'duration':duration})
         
         #Regular: might encounter passing
         else: 
             if lastRegularNumber != number - 1:
                 passedCount += number - lastRegularNumber - 1
             lastRegularNumber = number
-            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':0,'passedCount':passedCount,'lateCount':0})
+            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':0,'passedCount':passedCount,'lateCount':0,'duration':duration})
         
         signBook.append(number)
         order += 1
@@ -308,6 +313,7 @@ while True:
         printUsage()
         usage = False
     line = raw_input('Enter Command: ')
+    line = line.decode('utf-8')
     token = line.split(' ')
 
     if token[0] == 'list':
