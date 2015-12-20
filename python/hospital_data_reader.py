@@ -131,7 +131,8 @@ def listDoctorForExport(params):
 
 def listDoctorForOrderExport(params):
     #Exporting format:
-    #number, date, time, interval, order(actual order meeting doctor), isPassed(whether the patient is late, 0 == False, 1 == True), passedCount(including missing ones), lateCount 
+    #number, date, time, interval, order(actual order meeting doctor), isPassed(whether the patient is late, 0 == False, 1 == True), passedCount(including missing
+    # ones), lateCount, lateOriginalOrder: 遲到者原本的Order, Duration
 
     output = None
     result = DB.searchByParams(params)
@@ -142,7 +143,8 @@ def listDoctorForOrderExport(params):
     passedCount = 0
     curDate = ''
     curInterval = ''
-    signBook = []
+    signBook = [] #record the number that did came to the doctor
+    passedSignBook = {} #record the passed patients' original order
     sessionData = []
     
     #Signal as EOF
@@ -165,12 +167,12 @@ def listDoctorForOrderExport(params):
         duration    = transfer_minute(row[10])
 
         if output == None:
-            line = u'%s/%s-%s.txt' % (params['filePath'].encode('utf-8').decode('utf-8'), dept.encode('utf-8').decode(
-                    'utf-8'), name.encode('utf-8').decode('utf-8'))
+            line = u'%s/%s-%s.txt' % (params['filePath'].encode('utf-8').decode('utf-8'), dept.encode('utf-8').decode('utf-8'), name.encode('utf-8').decode('utf-8'))
             output = open(line, 'w')
-            output.write('number\tdate\ttime\tinterval\torder\tisPassed\tpassedCount\tlateCount\tduration\n')
+            output.write('number\tdate\ttime\tinterval\torder\tisPassed\tpassedCount\tpassedOriginalOrder\tlateCount'
+                         '\tduration\n')
 
-        #Initialization for each intervals
+        #Initialization for each intervals, and the outputting of data when each interval is processed
         #1. Read everything into sessionData.
         #2. Add lateCount before processing the next interval
         if curInterval != interval or curDate != date:
@@ -193,36 +195,43 @@ def listDoctorForOrderExport(params):
                     else:
                         sessionData[i]['lateCount'] = lastLateCount - 1
                 for p in sessionData:
-                    output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n' % (p['number'] , p['date'] , p['start'] ,
-                                                                       p['interval'] , p['order'] , p['isPassed'] ,
-                                                                       p['passedCount'], p['lateCount'], p['duration']))
+                    output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\n' % (p['number'] , p['date'] , p['start'] ,p['interval'] , p['order'] , p['isPassed'] ,
+                                                                           p['passedCount'], p['lateCount'], p['lateOriginalOrder'], p['duration']))
 
             #Formatting the dictionary for each rows
             sessionData = []
             signBook = []
+            passedSignBook = {}
             curInterval = interval
             curDate = date
             lastRegularNumber = 0
             order = 1
             passedCount = 0
            
-        if number in signBook:##########################
+        if number in signBook:########### WHAT TO DO WITH THESE GUYS WHO JUST WON'T LEAVE!!??? (Some of them with good reasons maybe)###############
             continue
         
         #PASSED : decrease passedCount
-        if row[6] == '{"over":true}':
+        #if row[6] == '{"over":true}': # <== This is problematic. Some times patients were skipped too fast that regular patient would be viewed as passed by SYSTEM
+        elif number < lastRegularNumber:
             passedCount -= 1
-            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),
+            try:
+                sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),
                                 'interval':interval.encode('utf-8'),'order':order,'isPassed':1,
-                                'passedCount':passedCount,'lateCount':0,'duration':duration})
-        
+                                'passedCount':passedCount,'lateCount':0, 'lateOriginalOrder':passedSignBook[number], 'duration':duration})
+            except KeyError:
+                print 'KeyError:', number, '\n', name, date, interval, '\n', passedSignBook
+
         #Regular: might encounter passing
         else: 
             if lastRegularNumber != number - 1:
-                passedCount += number - lastRegularNumber - 1
+                delta = number - lastRegularNumber
+                passedCount += delta - 1
+                for steps in range(1, delta):
+                    passedSignBook[number - steps] = order
             lastRegularNumber = number
-            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':0,'passedCount':passedCount,'lateCount':0,'duration':duration})
-        
+            sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,
+                                'isPassed':0,'passedCount':passedCount,'lateCount':0, 'lateOriginalOrder':0, 'duration':duration})
         signBook.append(number)
         order += 1
 
