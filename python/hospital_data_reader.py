@@ -150,12 +150,13 @@ def listDoctorForOrderExport(params):
     peopleSeconds = 0 #record the people*seconds of passed patients, as the denominator for the frequeny of late person showing up
     totalPassedCount = 0
     durationSum = 0 #As the denominator for calculating average session time
+    # TODO: 應該要把每個Interval每一個小時都填上0或1
     #以每小時紀錄略過號碼的比例
     #Format: 診次:{小時:{pass:A, total:X}}
-    passProbHour = {'上午診':{}, '下午診':{}, '夜間診':{}}
+    passProbHour = {u'上午診':{}, u'下午診':{}, u'夜間診':{}}
     #以每小時紀錄遲到者出現的比例
     #Format: 診次:{小時:{appeared:A, denominator:X}}
-    recoverProbHour = {'上午診':{}, '下午診':{}, '夜間診':{}}
+    recoverProbHour = {u'上午診':{}, u'下午診':{}, u'夜間診':{}}
 
     #Signal as EOF
     result.append(['','1970-1-1','','','','','',0,0,0,0])
@@ -169,11 +170,12 @@ def listDoctorForOrderExport(params):
         name        = row[2]
         dept        = row[3]
         room        = row[4]
-        interval    = unicode(row[5])
+        interval    = row[5]
         #if row[6] != '{"over":true}':
         #    continue
         number   = int(row[7])
-        start       = datetime.datetime.fromtimestamp(int(row[8])).strftime('%H:%M:%S')
+        time = datetime.datetime.fromtimestamp(int(row[8]))
+        start       = time.strftime('%H:%M:%S')
         duration    = transfer_minute(row[10])
         durationSeconds = row[10]
 
@@ -207,10 +209,13 @@ def listDoctorForOrderExport(params):
                 for p in sessionData:
                     output.write('%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\n' % (p['number'] , p['date'] , p['start'] ,p['interval'] , p['order'] , p['isPassed'] , p['passedCount'], p['lateCount'], p['lateOriginalOrder'], p['duration']))
 
-            if(len(sessionData) > 1):
+            if len(sessionData) > 1:
                 summary.append([sessionData[len(sessionData)-1]['number'],sessionData[len(sessionData)-1]['passedCount']])
 
-            #Formatting the dictionary for each
+            if interval == '': # EOF
+                break
+
+            #Formatting the dictionary for each Interval
             sessionData = []
             signBook = []
             lateSignBook = {}
@@ -221,6 +226,7 @@ def listDoctorForOrderExport(params):
             passedCount = 0
             lastRegularStart = None
 
+        # TODO: 把後一號（後幾號）都解釋成過號，篩掉太短duration的
         if number in signBook:########### WHAT TO DO WITH THESE GUYS WHO JUST WON'T LEAVE!!??? (Some of them with good reasons maybe)###############
             continue
 
@@ -228,31 +234,31 @@ def listDoctorForOrderExport(params):
         #if row[6] == '{"over":true}': # <== This is problematic. Some times patients were skipped too fast that regular patient would be viewed as passed by SYSTEM
         elif number < lastRegularNumber:
             passedCount -= 1
+            if time.hour in recoverProbHour[interval]:
+                recoverProbHour[interval][time.hour]['appeared'] += 1
+                recoverProbHour[interval][time.hour]['denominator'] += passedCount * (time - lastRegularStart).total_seconds()
+            else:
+                recoverProbHour[interval][time.hour] = {'appeared': 1, 'denominator': passedCount * (time - lastRegularStart).total_seconds()}
             sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':1,'passedCount':passedCount,'lateCount':0, 'lateOriginalOrder':lateSignBook[number], 'duration':duration})
 
         #Regular: might encounter passing
         else:
             delta = number - lastRegularNumber
-            if delta != 1:
-                passedCount += delta - 1
-                if start.hour in passProbHour[interval]:
-                    passProbHour[interval][start.hour]['pass'] += delta -1
-                    passProbHour[interval][start.hour]['total'] += delta
-                else:
-                    passProbHour[interval][start.hour] = {'pass':delta - 1, 'total': delta}
-                if start.hour in recoverProbHour[interval] and passedCount > 0:
-                    recoverProbHour[interval][start.hour]['denominator'] += passedCount * (start - lastRegularStart).total_seconds()
-
-                for steps in range(1, delta):
-                    lateSignBook[number - steps] = order
+            passedCount += delta - 1
+            if time.hour in passProbHour[interval]:
+                passProbHour[interval][time.hour]['pass'] += delta -1
+                passProbHour[interval][time.hour]['total'] += delta
             else:
-                if start.hour in passProbHour[interval]:
-                    passProbHour[interval][start.hour]['total'] += 1
-                else:
-                    passProbHour[interval][start.hour] = {'pass': , 'total': 1}
+                passProbHour[interval][time.hour] = {'pass':delta - 1, 'total': delta}
+            if time.hour in recoverProbHour[interval] and passedCount > 0 and order > 1:
+                recoverProbHour[interval][time.hour]['denominator'] += passedCount * (time - lastRegularStart).total_seconds()
+            elif time.hour not in recoverProbHour[interval] and passedCount > 0 and order > 1:
+                recoverProbHour[interval][time.hour] = {'appeared': 0, 'denominator': passedCount * (time - lastRegularStart).total_seconds()}
+            for steps in range(1, delta):
+                lateSignBook[number - steps] = order
 
             lastRegularNumber = number
-            lastRegularStart = start
+            lastRegularStart = time
             sessionData.append({'number':number,'date':date.encode('utf-8'),'start':start.encode('utf-8'),'interval':interval.encode('utf-8'),'order':order,'isPassed':0,'passedCount':passedCount,'lateCount':0, 'lateOriginalOrder':0, 'duration':duration})
 
         signBook.append(number)
@@ -272,11 +278,9 @@ def listDoctorForOrderExport(params):
         #output.write('%d\t%d\n' % (p[0], p[1]))
         skipping += p[1]
         total += p[0]
-    averageSkip = float(skipping) / total #其實這是計算完全消失的比例而非跳號的可能性，時間會高估。但是也可以說假設這些短期遲到的馬上都跑回來看了
     averageTime = durationSum / total
-    reappearanceFrequency = float(totalPassedCount) / peopleSeconds
 
-    with open(line,'rw+') as fp:
+    with open(line,'r+') as fp:
         content = fp.readlines()
         fp.seek(0)
         fp.truncate()
@@ -292,14 +296,21 @@ def listDoctorForOrderExport(params):
         for i in range(1, len(content)):# Starting from 1 skipping the header
         #Column format: 0:number\1:date\2:time\3:interval\4:order\5:isPassed\6:passedCount\7:lateCount\8:lateOriginalOrder\9:duration\10:answer-etimation\11:estimation
             items = content[i].rstrip().split('\t')
-            #if items[1] != lastDate or items[3] != lastInterval
-                #some preparations of next interval
             if int(items[4]) < skip + vision or int(items[5]) == 1:
                 fp.write(content[i].rstrip() + '\tNA\tNA\n')
                 continue
             else:
                 j = i-vision
                 pastItems = content[j].rstrip().split('\t')
+                pastInterval = pastItems[3].decode('utf-8')
+                pastHour = datetime.datetime.strptime(pastItems[2], '%H:%M:%S').hour
+                try:
+                    averageSkip = (float(passProbHour[pastInterval][pastHour]['pass']) / passProbHour[pastInterval][pastHour]['total'])
+                    #其實這是計算完全消失的比例而非跳號的可能性，時間會高估。但是也可以說假設這些短期遲到的馬上都跑回來看了
+                    reappearanceFrequency = float(recoverProbHour[pastInterval][pastHour]['appeared']) / recoverProbHour[pastInterval][pastHour]['denominator']
+                except KeyError:
+                    print 'KeyError, time=', pastItems[2], 'date=', pastItems[1], 'Keys are:', recoverProbHour[pastInterval].keys(), 'Interval is:', pastInterval
+                    sys.stdout.flush()
                 lastRegularNumber = int(pastItems[0])
                 isPassed = int(pastItems[5])
                 while isPassed == 1:#Finding the closest regular patient near the start of vision
@@ -312,9 +323,9 @@ def listDoctorForOrderExport(params):
                 #預期已經遲到但是又會再出現的人
                 estimatedReappearance = math.floor(int(pastItems[6]) * averageTime * estimatedRegular * reappearanceFrequency)
                 estimation = (estimatedRegular + estimatedReappearance) * averageTime
-                answer = (datetime.datetime.strptime(items[2],'%H:%M:%S') - datetime.datetime.strptime(pastItems[2],'%H:%M:%S')).total_seconds()
+                answer = (datetime.datetime.strptime(items[2], '%H:%M:%S') - datetime.datetime.strptime(pastItems[2],'%H:%M:%S')).total_seconds()
                 diff = answer - estimation
-                fp.write(content[i].rstrip() + '\t%d\t%d\n' % (diff,estimation))
+                fp.write(content[i].rstrip() + '\t%d\t%d\n' % (diff, estimation))
 
 def export(filePath):
     doctorList = DB.getDoctorList()
@@ -325,12 +336,14 @@ def export(filePath):
         listDoctorForExport(data)
 
 def export_order(filePath):
-    doctorList = DB.getDoctorList()
-    for doctor in doctorList:
-        data = {}
-        data['name'] = doctor
-        data['filePath'] = filePath
-        listDoctorForOrderExport(data)
+    #doctorList = DB.getDoctorList()
+    #for doctor in doctorList:
+    #    data = {}
+    #    data['name'] = doctor
+    #    data['filePath'] = filePath
+    #    listDoctorForOrderExport(data)
+    data = {'name':'蕭炳昆', 'filePath':filePath}
+    listDoctorForOrderExport(data)
 
 def calculate(config):
     data = {}
