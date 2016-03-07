@@ -37,15 +37,6 @@ def timestamp_to_sec(timeString):
     return int(curTimeTuple[0]) * 3600 + int(curTimeTuple[1]) * 60 + int(curTimeTuple[2])
 
 
-def sessionDataIndex(haystack,column,needle):
-    # Linear search, returning then index of the needle in a specific column within a 2x2 table haystack, or else return -1
-
-    for i in range(0, len(haystack)):
-        if haystack[i][column] == needle:
-            return i
-    return -1
-
-
 def interpolation(table, x = None, y = None):
     # TODO: 其實目前處理邊界條件還是有點問題
     maxKey = 0
@@ -128,8 +119,7 @@ class ModelBuilder:
             curNumber = int(row[7])
             curDatetime = datetime.datetime.fromtimestamp(int(row[8]))
             curTime = curDatetime.strftime('%H:%M:%S')
-            # 這不是真正計算時使用的，調整過的等效duration
-            duration = sec_to_timestamp(row[10])
+            # 這不是真正計算時使用的調整過的等效duration
             durationSeconds = row[10]
             
 
@@ -160,13 +150,13 @@ class ModelBuilder:
 
             # REGULAR patients:
             else:
-                delta = curNumber - lastRegularNumber
-                passedCount += delta - 1
+                numDiff = curNumber - lastRegularNumber
+                passedCount += numDiff - 1
                 lastRegularNumber = curNumber
                 patient = {'number': curNumber, 'date': curDate.encode('utf-8'), 'time': curTime.encode('utf-8'), 'shift': curShift.encode('utf-8'), 'order': order, 'isPassed': 0, 'passedCount': passedCount}
                 self.__session_append(curDate, curShift, patient)
 
-            # answerTime[Date][shift][number] = answer in seconds
+            # answerTime[Date][shift][number] = answer in timeSeconds
             ModelBuilder.dict_update_recursive(self.__answerTime, {curDate: {curShift: {curNumber: timestamp_to_sec(curTime)}}})
             # End of iteration preparation
             order += 1
@@ -176,55 +166,77 @@ class ModelBuilder:
             for curShift, patients in branch.items():
                 curWeekday = datetime.datetime.strptime(curDate, '%Y-%m-%d').weekday() + 1
                 lastRegularNumber = 0
-                self.__numberCount += max(patients, key=lambda p:p['number'])['number']
+                
+                # TESTing: 要drop最後一位，因為很可能是醫師放置play而已。當然也可能沒有這事
+                patients.pop(len(patients) - 1)
+                
+                localMaxNumber = max(patients, key=lambda p:p['number'])['number']
+                self.__numberCount += localMaxNumber
                 self.__orderCount += len(patients)
+                
                 for i in range(1, len(patients)):
                     curHour = int(patients[i - 1]['time'].split(':')[0])
                     curDuration = timestamp_to_sec(patients[i]['time']) - timestamp_to_sec(patients[i - 1]['time'])
                     patients[i - 1]['duration'] = curDuration
                     self.__durationSum += curDuration
+                    
+                    # # TESTing inspecting
+                    # if curDate == '2015-11-21':
+                    #     print patients[i-1]['time'], patients[i-1]['number'], patients[i-1]['order'], patients[i-1]['isPassed']
+                    
                     if patients[i - 1]['isPassed'] == 1:
                         try:
                             self.__recoverProb[curWeekday][curShift][curHour]['appeared'] += 1
                             self.__recoverProb[curWeekday][curShift][curHour]['denominator'] += patients[i - 1]['passedCount'] * curDuration
                         except KeyError:
-                            leaf = {curWeekday: {curShift: {curHour: {'appeared': 1, 'denominator': patients[i - 1]['passedCount'] * curDuration}}}}
-                            ModelBuilder.dict_update_recursive(self.__recoverProb, leaf)
+                            branch = {curWeekday: {curShift: {curHour: {'appeared': 1, 'denominator': patients[i - 1]['passedCount'] * curDuration}}}}
+                            ModelBuilder.dict_update_recursive(self.__recoverProb, branch)
                     elif patients[i - 1]['isPassed'] == 0:
                         numDiff = patients[i - 1]['number'] - lastRegularNumber
                         try:
                             self.__passProb[curWeekday][curShift][curHour]['pass'] += numDiff - 1
                             self.__passProb[curWeekday][curShift][curHour]['total'] += numDiff
                         except KeyError:
-                            leaf = {curWeekday: {curShift: {curHour: {'pass': numDiff - 1, 'total': numDiff}}}}
-                            ModelBuilder.dict_update_recursive(self.__passProb, leaf)
+                            branch = {curWeekday: {curShift: {curHour: {'pass': numDiff - 1, 'total': numDiff}}}}
+                            ModelBuilder.dict_update_recursive(self.__passProb, branch)
                         try:
                             self.__recoverProb[curWeekday][curShift][curHour]['denominator'] += patients[i - 1]['passedCount'] * curDuration
                         except KeyError:
-                            leaf = {curWeekday: {curShift: {curHour: {'appeared': 0, 'denominator': patients[i - 1]['passedCount'] * curDuration}}}}
-                            ModelBuilder.dict_update_recursive(self.__recoverProb, leaf)
+                            branch = {curWeekday: {curShift: {curHour: {'appeared': 0, 'denominator': patients[i - 1]['passedCount'] * curDuration}}}}
+                            ModelBuilder.dict_update_recursive(self.__recoverProb, branch)
                         lastRegularNumber = patients[i - 1]['number']
 
     def testing(self, outputPath = '', skip=1, vision=10):
         for curDate, branch in self.__sessionData.items():
             for curShift, patients in branch.items():
                 curWeekday = datetime.datetime.strptime(curDate, '%Y-%m-%d').weekday() + 1
+                
+                # # TESTing 先用全部平均的方式算
+                # appeared = 0
+                # denominator = 0
+                # for hour, hourData in self.__recoverProb[curWeekday][curShift].items():
+                #     appeared += hourData['appeared']
+                #     denominator += hourData['denominator']
+                # reappFreq = float(appeared) / denominator
+                
+                passFreq = float(self.__orderCount) / self.__numberCount
+                
                 # i is the starting condition of prediction
                 for i in range(0, len(patients)):
                     if i < skip:
                         continue
+                    
+                    # TESTing 其實應該是要從lastRegularNumber開始算，不過現在懶得區分XD
+                    if patients[i]['isPassed'] == 1:
+                        continue
+                    
                     curTime = patients[i]['time']
                     curHour = int(curTime.split(':')[0])
                     try:
                         #其實這是計算完全消失的比例而非跳號的可能性，時間會高估。但是也可以說假設這些短期遲到的馬上都跑回來看了
-                        passFreq = float(self.__passProb[curWeekday][curShift][curHour]['pass']) / self.__passProb[curWeekday][curShift][curHour]['total']
-                        # reappFreq = float(self.__recoverProb[curWeekday][curShift][curHour]['appeared']) / self.__recoverProb[curWeekday][curShift][curHour]['denominator']
-                        appeared = 0
-                        denominator = 0
-                        for hour, hourData in self.__recoverProb[curWeekday][curShift].items():
-                            appeared += hourData['appeared']
-                            denominator += hourData['denominator']
-                        reappFreq = float(appeared) / denominator
+                        # passFreq = 1.0 - float(self.__passProb[curWeekday][curShift][curHour]['pass']) / self.__passProb[curWeekday][curShift][curHour]['total']
+                        reappFreq = float(self.__recoverProb[curWeekday][curShift][curHour]['appeared']) / self.__recoverProb[curWeekday][curShift][curHour]['denominator']
+                        pass
                     except KeyError:
                         # TODO: why this happens?
                         print "KeyError"
@@ -238,11 +250,11 @@ class ModelBuilder:
                     for j in range(i + vision, len(patients)):
                         if patients[j]['isPassed'] == 1:
                             continue
-                        # # TESTing
+                        
+                        # # Limiting?
                         # if patients[j]['number'] - patients[i]['number'] > vision + 3:
                         #     continue
-                        # estimatedRegular = (patients[j]['number'] - patients[i]['number']) * passFreq
-                        estimatedRegular = (patients[j]['number'] - patients[i]['number']) * self.__orderCount / self.__numberCount
+                        estimatedRegular = (patients[j]['number'] - patients[i]['number']) * passFreq
                         estimatedReappearance = math.floor(patients[i]['passedCount'] * self.get_average_time() * estimatedRegular * reappFreq)
                         estimation = (estimatedRegular + estimatedReappearance) * self.get_average_time()
                         answer = self.__answerTime[curDate][curShift][patients[j]['number']]
